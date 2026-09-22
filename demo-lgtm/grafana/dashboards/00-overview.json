@@ -1,0 +1,341 @@
+{
+  "uid": "o11y-overview",
+  "title": "00 \u00b7 Overview \u2014 the whole stack",
+  "description": "Every demo at once. Use this to prove the pipeline is alive before you open a demo dashboard.",
+  "tags": [
+    "o11y",
+    "overview"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "10s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### The stack\n`:8001` manual SDK &nbsp;\u00b7&nbsp; `:8002` contrib &nbsp;\u00b7&nbsp; `:8003` compile-time &nbsp;\u00b7&nbsp; `:8004` eBPF (Lima VM) &nbsp;\u00b7&nbsp; `:8006` profiles\n\nTraces \u2192 **Tempo** &nbsp;\u00b7&nbsp; metrics \u2192 **Prometheus** &nbsp;\u00b7&nbsp; profiles \u2192 **Pyroscope**. One collector fans all of it out."
+      },
+      "id": 1,
+      "description": "What is running, on which port, and where each signal is stored."
+    },
+    {
+      "type": "timeseries",
+      "title": "Request rate by service \u2014 demo 3 is absent on purpose, it has no HTTP metric",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (exported_job) (rate(http_server_request_duration_seconds_count[1m]))",
+          "legendFormat": "{{exported_job}}",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (exported_job) (rate(demo1_requests_total[1m]))",
+          "legendFormat": "{{exported_job}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 2,
+      "description": "One line per demo, from the request-duration histogram plus demo 1's hand-written counter. Demo 3 has no line because otelc's HTTP instrumentation emits spans only."
+    },
+    {
+      "type": "timeseries",
+      "title": "p95 latency by service",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, exported_job) (rate(http_server_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{exported_job}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 3,
+      "description": "p95 read from the duration histogram buckets. Only demos 2 and 4 publish such a histogram."
+    },
+    {
+      "type": "table",
+      "title": "Recent traces \u2014 manual SDK",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 12
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"demo1-manual-sdk\"}",
+          "limit": 10,
+          "tableType": "traces"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 4,
+      "description": "Latest traces from demo 1. The spans are hand-written, and their kind is INTERNAL rather than SERVER."
+    },
+    {
+      "type": "table",
+      "title": "Recent traces \u2014 contrib",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 12
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"demo2-contrib-http\"}",
+          "limit": 10,
+          "tableType": "traces"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 5,
+      "description": "Latest traces from demo 2. One wrapper call produced 12 convention-correct attributes per span."
+    },
+    {
+      "type": "table",
+      "title": "Recent traces \u2014 compile-time",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 12
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"demo3-compile-time\"}",
+          "limit": 10,
+          "tableType": "traces"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 6,
+      "description": "Latest traces from demo 3. The source has no OpenTelemetry import; otelc added the span at build time."
+    },
+    {
+      "type": "table",
+      "title": "Recent traces \u2014 eBPF",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 12
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"demo4-ebpf\"}",
+          "limit": 10,
+          "tableType": "traces"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 7,
+      "description": "Latest traces from demo 4. Three spans per request, produced from outside the process by eBPF."
+    },
+    {
+      "type": "flamegraph",
+      "title": "CPU profile \u2014 demo6",
+      "datasource": {
+        "type": "grafana-pyroscope-datasource",
+        "uid": "pyroscope"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-pyroscope-datasource",
+            "uid": "pyroscope"
+          },
+          "queryType": "profile",
+          "profileTypeId": "process_cpu:cpu:nanoseconds:cpu:nanoseconds",
+          "labelSelector": "{service_name=\"demo6-profiles\"}",
+          "groupBy": []
+        }
+      ],
+      "id": 8,
+      "description": "Demo 6's CPU profile, the fourth signal. sha256 work under main.crunchNumbers dominates it."
+    }
+  ]
+}

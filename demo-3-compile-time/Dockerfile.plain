@@ -1,0 +1,17 @@
+# Demo 4: the same main.go, built the completely ordinary way.
+#
+# No otelc, no OTel import, nothing added at build time. Demo 4 attaches
+# to this binary from outside, with eBPF, while it is already running.
+# Diff this file against Dockerfile to see the entire difference between
+# compile-time instrumentation and eBPF instrumentation.
+FROM golang:1.26-alpine AS build
+WORKDIR /src
+COPY go.mod ./
+RUN go mod download || true
+COPY main.go ./
+RUN CGO_ENABLED=0 go build -o /app .
+
+FROM alpine:3.20
+COPY --from=build /app /app
+EXPOSE 8004
+CMD ["/app"]

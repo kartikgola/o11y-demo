@@ -1,0 +1,54 @@
+# Demo 4 runs in a Lima VM, not on Docker Desktop. eBPF needs a real
+# Linux kernel with BTF. See README.md for the one-time VM setup.
+#
+# The app is built from Demo 3's main.go, with a plain `go build`. Same
+# source, no OTel import, no build-time rewriting. Everything you see in
+# Grafana comes from the obi sidecar attaching to the running process.
+
+services:
+  # --- App: Demo 3's source, built the completely ordinary way ---
+  app:
+    build:
+      context: ../demo-3-compile-time
+      dockerfile: Dockerfile.plain
+    container_name: demo4-app
+    environment:
+      PORT: "8004"
+    ports:
+      - "8004:8004"
+    restart: unless-stopped
+
+  # --- OBI: attaches to the app process from outside, via eBPF ---
+  obi:
+    image: otel/ebpf-instrument:main
+    container_name: demo4-obi
+    pid: "host"
+    privileged: true
+    environment:
+      OTEL_EBPF_OPEN_PORT: "8004"
+      OTEL_EBPF_TRACE_PRINTER: "text"
+      OTEL_SERVICE_NAME: "demo4-ebpf"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://host.docker.internal:4318"
+      # OBI exports metrics on the OTel default of 60 s. Demos 1, 2 and 3 all
+      # export every 5 s, so without this the eBPF panels lag the others by a
+      # full minute and look broken on stage. Traces are unaffected — those
+      # are pushed as they happen, which is why Tempo fills instantly.
+      OTEL_METRIC_EXPORT_INTERVAL: "5000"
+    restart: unless-stopped
+    depends_on:
+      - app
+
+  # --- Load: keeps the eBPF dashboard populated ---
+  #
+  # This runs INSIDE the VM on purpose. Lima's forward of port 8004 to the
+  # Mac is a single point of failure: the socket stays bound even after the
+  # tunnel dies, so a load loop on the Mac fails silently and the dashboard
+  # goes flat with nothing obviously broken. Driving the app from a
+  # container next to it removes that dependency completely.
+  load:
+    image: curlimages/curl:latest
+    container_name: demo4-load
+    command: ["sh", "-c", "while true; do curl -s -o /dev/null -m 2 http://app:8004/hello; sleep 0.2; done"]
+    restart: unless-stopped
+    depends_on:
+      - app

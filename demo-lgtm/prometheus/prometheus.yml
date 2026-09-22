@@ -1,0 +1,10 @@
+global:
+  # 5s, not the 15s default. On stage this is the difference between a
+  # metric showing up while you are still talking about it and a pause.
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: collector
+    static_configs:
+      - targets: ["collector:8889"]

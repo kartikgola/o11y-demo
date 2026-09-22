@@ -1,0 +1,77 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  pprof:
+    # This is server (push) mode. Demo apps POST a runtime/pprof profile
+    # here. The collector does not need to know which demo to scrape.
+    server:
+      endpoint: 0.0.0.0:4319
+
+processors:
+  batch:
+  # The pprof server-mode push has no field for resource attributes.
+  # Without this processor, every profile lands as "unknown_service".
+  resource/pprof_service_name:
+    attributes:
+      - key: service.name
+        value: demo6-profiles
+        action: upsert
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  # This exporter sends a copy of every trace to Weaver's live-check
+  # (see demo-5-weaver/). When weaver-livecheck is not running, the
+  # collector logs harmless connection-refused retries. The logs and
+  # profiles pipelines do the same when no demo uses them.
+  #
+  # Weaver's OTLP gRPC receiver rejects gzip ("Unimplemented desc =
+  # Content is compressed with `gzip` which isn't supported"). Set
+  # compression: none to fix this.
+  #
+  # Start weaver-livecheck before you start this collector. If you
+  # start the collector first, its gRPC client resolves an empty
+  # address for weaver-livecheck and never retries the lookup. Traces
+  # to Weaver then fail with "no children to pick from". If this
+  # happens, run: docker compose restart collector.
+  otlp/weaver:
+    endpoint: weaver-livecheck:4317
+    tls:
+      insecure: true
+    compression: none
+  prometheus:
+    endpoint: 0.0.0.0:8889
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+    tls:
+      insecure: true
+  otlp/pyroscope:
+    endpoint: pyroscope:4040
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/tempo, otlp/weaver]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/loki]
+    profiles:
+      # The batch processor does not yet support the profiles signal.
+      receivers: [otlp, pprof]
+      processors: [resource/pprof_service_name]
+      exporters: [otlp/pyroscope]

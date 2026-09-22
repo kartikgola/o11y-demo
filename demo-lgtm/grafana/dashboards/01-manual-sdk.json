@@ -1,0 +1,198 @@
+{
+  "uid": "o11y-demo1",
+  "title": "01 \u00b7 Manual SDK \u2014 every span by hand",
+  "description": "Rung 1. Every span, attribute and counter on this page exists because somebody typed it.",
+  "tags": [
+    "o11y",
+    "demo"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "10s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### Rung 1 \u2014 the manual SDK\nEverything here is a line of code somebody wrote. The span name `handle_request`, both attributes, and the counter.\n\n**Open a trace and look at the attribute list** \u2014 then compare it with demo 2. This one is pinned to semconv **v1.26.0**, so it still emits the deprecated `http.method` and the non-existent `http.path`."
+      },
+      "id": 1,
+      "description": "What rung 1 costs: the SDK setup and the per-request code are both yours to write."
+    },
+    {
+      "type": "table",
+      "title": "Traces \u2014 click one to open the waterfall",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 14,
+        "x": 0,
+        "y": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"demo1-manual-sdk\"}",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 2,
+      "description": "Spans written by hand. Two things to notice: the kind is INTERNAL, not SERVER, and only 2 attributes were set."
+    },
+    {
+      "type": "stat",
+      "title": "demo1.requests \u2014 the one hand-written counter",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 10,
+        "x": 14,
+        "y": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(demo1_requests_total)",
+          "legendFormat": "{{exported_job}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "graphMode": "area",
+        "colorMode": "value",
+        "textMode": "auto"
+      },
+      "id": 3,
+      "description": "The single counter in the source. It counts requests and can never tell you how slow they were."
+    },
+    {
+      "type": "timeseries",
+      "title": "Counter rate, by the one attribute we bothered to set",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 10,
+        "x": 14,
+        "y": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (http_method) (rate(demo1_requests_total[1m]))",
+          "legendFormat": "{{http_method}}",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 4,
+      "description": "The same counter, split by the one attribute the code bothered to set. No route, no status code."
+    },
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### What is missing\nNo latency histogram. No status code. No route. No request or response size. **Not because the SDK cannot do it** \u2014 because nobody wrote those lines."
+      },
+      "id": 5,
+      "description": "What a hand-written counter cannot give you, no matter how carefully it is written."
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+apiVersion: 1
+
+# Loads every dashboard JSON in ./dashboards into a folder called
+# "o11y demos". One dashboard per demo, so you never have to navigate
+# Explore during the talk.
+providers:
+  - name: o11y-demos
+    orgId: 1
+    folder: "o11y demos"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

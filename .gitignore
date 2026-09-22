@@ -1,0 +1,12 @@
+# Binaries left in the tree by a local `go build`
+demo-1-manual-sdk/demo1-manual-sdk
+demo-2-contrib-http/demo2-contrib-http
+demo-3-compile-time/demo3-compile-time
+demo-4-ebpf/demo4-ebpf
+demo-6-profiles/demo6-profiles
+
+# otelc's build cache and rewritten sources (Demo 3)
+demo-3-compile-time/.otelc-build/
+
+# macOS
+.DS_Store

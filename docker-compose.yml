@@ -1,0 +1,221 @@
+# One stack, one command:
+#
+#     docker compose up -d --build
+#
+# This brings up the LGTM backends, the collector, Weaver's live-check,
+# and every demo app that runs on Docker Desktop. Nothing has to be
+# stopped and restarted between demos.
+#
+#     :8001  demo1  manual SDK
+#     :8002  demo2  contrib (otelhttp)
+#     :8003  demo3  compile-time (otelc)
+#     :8006  demo6  profiles (runtime/pprof push)
+#     :3000  Grafana (admin / admin)
+#
+# Demo 4 (eBPF) is deliberately NOT here. It needs a real Linux kernel
+# with BTF, `pid: host` and `privileged: true`, so it runs in its own
+# Lima VM and reaches this collector over host.docker.internal:4318.
+# See demo-4-ebpf/README.md.
+#
+# The per-demo docker-compose.yml files still work on their own. Use
+# them to read one demo in isolation. Use this file to present.
+
+name: o11y-demo
+
+networks:
+  o11y-net:
+    name: o11y-net
+
+services:
+  # ------------------------------------------------------------------
+  # Backends
+  # ------------------------------------------------------------------
+
+  # --- Tempo (traces) ---
+  tempo:
+    image: grafana/tempo:2.6.1
+    container_name: tempo
+    ports:
+      - "3200:3200"
+    volumes:
+      - ./demo-lgtm/tempo/tempo.yaml:/etc/tempo.yaml:ro
+    command: ["-config.file", "/etc/tempo.yaml"]
+    networks:
+      - o11y-net
+
+  # --- Loki (logs) ---
+  loki:
+    image: grafana/loki:3.3.0
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./demo-lgtm/loki/loki.yaml:/etc/loki/loki.yaml:ro
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    networks:
+      - o11y-net
+
+  # --- Prometheus (metrics) ---
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./demo-lgtm/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    networks:
+      - o11y-net
+
+  # --- Pyroscope (profiles) ---
+  pyroscope:
+    image: grafana/pyroscope:2.1.2
+    container_name: pyroscope
+    command: ["-self-profiling.disable-push=true"]
+    ports:
+      - "4040:4040"
+    networks:
+      - o11y-net
+
+  # ------------------------------------------------------------------
+  # Governance — Demo 5
+  # ------------------------------------------------------------------
+
+  # Weaver live-checks a copy of every trace against the upstream
+  # semantic-conventions registry. It must start BEFORE the collector:
+  # the collector's gRPC client resolves this name once, at startup, and
+  # never retries the lookup. The collector's depends_on below is what
+  # removes the old "docker compose restart collector" step.
+  #
+  # --inactivity-timeout is 3600 s, long enough for a whole talk. At the
+  # old 300 s the container exited part-way through the slides.
+  weaver-livecheck:
+    image: otel/weaver:v0.26.1
+    container_name: weaver-livecheck
+    command:
+      - "registry"
+      - "live-check"
+      - "--inactivity-timeout=3600"
+      - "--format=ansi"
+      - "--otlp-grpc-address=0.0.0.0"
+    networks:
+      - o11y-net
+
+  # ------------------------------------------------------------------
+  # Ingestion
+  # ------------------------------------------------------------------
+
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.161.0
+    container_name: collector
+    command:
+      - "--config=/etc/otelcol-contrib/config.yaml"
+      - "--feature-gates=+service.profilesSupport"
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "4319:4319"   # pprof push receiver (Demo 6: profiles)
+      - "8889:8889"   # Prometheus scrape endpoint
+    volumes:
+      - ./demo-lgtm/collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    networks:
+      - o11y-net
+    depends_on:
+      - tempo
+      - prometheus
+      - loki
+      - pyroscope
+      - weaver-livecheck
+
+  # ------------------------------------------------------------------
+  # UI
+  # ------------------------------------------------------------------
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      # No login prompt on stage. Local demo stack only.
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_USERS_DEFAULT_THEME=light
+    volumes:
+      - ./demo-lgtm/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./demo-lgtm/grafana/provider.yml:/etc/grafana/provisioning/dashboards/provider.yml:ro
+      - ./demo-lgtm/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - o11y-net
+    depends_on:
+      - tempo
+      - prometheus
+      - loki
+      - pyroscope
+
+  # ------------------------------------------------------------------
+  # Demo apps — the instrumentation ladder
+  # ------------------------------------------------------------------
+
+  # --- Demo 1: every span and every attribute written by hand ---
+  demo1:
+    build: ./demo-1-manual-sdk
+    container_name: demo1
+    ports:
+      - "8001:8001"
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "collector:4318"
+    networks:
+      - o11y-net
+    depends_on:
+      - collector
+
+  # --- Demo 2: one otelhttp wrapper call ---
+  demo2:
+    build: ./demo-2-contrib-http
+    container_name: demo2
+    ports:
+      - "8002:8002"
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "collector:4318"
+    networks:
+      - o11y-net
+    depends_on:
+      - collector
+
+  # --- Demo 3: zero OTel imports, only the build command changes ---
+  #
+  # otelc's injected SDK uses env-var autoconfiguration, so the endpoint
+  # needs a scheme here. Demo 1 and Demo 2 call .WithEndpoint() directly
+  # and accept a bare host:port.
+  #
+  # OTEL_METRIC_EXPORT_INTERVAL drops the Go runtime metric export from
+  # its 60 s default to 5 s. Without it you wait a full minute on stage
+  # for go_goroutine_count to appear.
+  demo3:
+    build: ./demo-3-compile-time
+    container_name: demo3
+    ports:
+      - "8003:8003"
+    environment:
+      PORT: "8003"
+      OTEL_SERVICE_NAME: "demo3-compile-time"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4318"
+      OTEL_METRIC_EXPORT_INTERVAL: "5000"
+    networks:
+      - o11y-net
+    depends_on:
+      - collector
+
+  # --- Demo 6: profiles, pushed as runtime/pprof to the collector ---
+  demo6:
+    build: ./demo-6-profiles
+    container_name: demo6
+    ports:
+      - "8006:8006"
+    networks:
+      - o11y-net
+    depends_on:
+      - collector

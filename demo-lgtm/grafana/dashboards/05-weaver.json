@@ -1,0 +1,138 @@
+{
+  "uid": "o11y-demo5",
+  "title": "05 \u00b7 Weaver \u2014 same request, two verdicts",
+  "description": "Governance. Weaver publishes no telemetry of its own \u2014 its verdict goes to its container log. These panels are the traces it is judging.",
+  "tags": [
+    "o11y",
+    "demo"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "10s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### Weaver live-check\nWeaver's verdict prints to its container log \u2014 run `docker compose logs weaver-livecheck`. This dashboard shows the two trace streams it is judging, side by side.\n\n**Open one trace from each table and compare the attribute names.** Same HTTP request, same registry, two different verdicts."
+      },
+      "id": 1,
+      "description": "How to read Weaver's verdict, and which container log it prints to."
+    },
+    {
+      "type": "table",
+      "title": "Demo 1 \u2014 pinned to semconv v1.26.0 \u2192 VIOLATIONS",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"demo1-manual-sdk\"}",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 2,
+      "description": "Demo 1's traces \u2014 the input Weaver rejects. http.method is deprecated and http.path is not in the registry."
+    },
+    {
+      "type": "table",
+      "title": "Demo 2 \u2014 current conventions \u2192 CLEAN",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"demo2-contrib-http\"}",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "id": 3,
+      "description": "Demo 2's traces \u2014 the input Weaver accepts. Nobody tried harder; they just never typed the names."
+    },
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### What Weaver flags\n```\nSpan handle_request `internal`\n    http.method = GET\n        - [violation] deprecated; renamed to `http.request.method`\n    http.path = /hello\n        - [violation] does not exist in the registry\n```\nChecked against the **live upstream registry**, pulled from GitHub at startup \u2014 so a rename in the next OTel release is flagged the same day."
+      },
+      "id": 4,
+      "description": "The exact violation text Weaver reports for demo 1, on every request."
+    }
+  ]
+}

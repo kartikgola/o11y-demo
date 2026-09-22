@@ -1,0 +1,87 @@
+{
+  "uid": "o11y-demo6",
+  "title": "06 \u00b7 Profiles \u2014 the fourth signal",
+  "description": "The fourth signal. Still alpha: there is no Go profiling SDK, so this demo pushes runtime/pprof output itself.",
+  "tags": [
+    "o11y",
+    "demo"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "15s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### Rung 4 signal \u2014 continuous profiling\nA 5-second CPU profile, captured back to back, forever. Hit `localhost:8006/work` and the hot frame below becomes `crunchNumbers` \u2192 `sha256.block`.\n\n**Width is time, depth is only nesting.** Look for the widest frame with nothing above it \u2014 that is where the CPU actually went."
+      },
+      "id": 1,
+      "description": "How the profile is captured and pushed, and why that is done by hand."
+    },
+    {
+      "type": "flamegraph",
+      "title": "CPU flame graph \u2014 demo6-profiles",
+      "datasource": {
+        "type": "grafana-pyroscope-datasource",
+        "uid": "pyroscope"
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-pyroscope-datasource",
+            "uid": "pyroscope"
+          },
+          "queryType": "profile",
+          "profileTypeId": "process_cpu:cpu:nanoseconds:cpu:nanoseconds",
+          "labelSelector": "{service_name=\"demo6-profiles\"}",
+          "groupBy": []
+        }
+      ],
+      "id": 2,
+      "description": "A 5-second CPU profile, captured back to back. One frame, sha256.blockSHA2, holds about half the self time."
+    },
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### If this is empty\nPyroscope takes **10 seconds to 2 minutes** to make a pushed profile queryable, and the first profile for a new service is the slowest. Keep a load loop running:\n\n```\nwhile true; do curl -s localhost:8006/work > /dev/null; done\n```"
+      },
+      "id": 3,
+      "description": "Why this panel can stay empty for the first minute or two after start-up."
+    }
+  ]
+}
